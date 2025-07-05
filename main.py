@@ -1,5 +1,3 @@
-
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from langchain_openai import ChatOpenAI
@@ -11,8 +9,7 @@ import re
 import requests
 import json
 from typing import Optional, List, Dict, Any
-import os
-# Database configuration
+
 db_config = {
     'host': os.environ.get('DB_HOST'),
     'user': os.environ.get('DB_USER'),
@@ -25,6 +22,7 @@ openrouter_config = {
     'api_key': os.environ.get('OPENROUTER_API_KEY'),
     'model': 'deepseek/deepseek-chat-v3-0324:free'
 }
+
 # External API
 external_api_url = 'https://bniapi.futureinfotechservices.in/BNI/bniapiecomm.php'
 
@@ -42,23 +40,46 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     user_id: str
     question: str
+    
+
 
 def get_db_connection():
     return mysql.connector.connect(**db_config)
 
+# def get_all_tables_schema():
+#     conn = get_db_connection()
+#     cursor = conn.cursor(dictionary=True)
+#     try:
+#         cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()")
+#         tables = [t['table_name'] for t in cursor.fetchall()]
+#         schema_info = {}
+#         for table in tables:
+#             cursor.execute(f"DESCRIBE {table}")
+#             columns = cursor.fetchall()
+#             cursor.execute(f"SELECT * FROM {table} LIMIT 2")
+#             sample = cursor.fetchall()
+#             schema_info[table] = {"columns": columns, "sample_data": sample}
+#         return schema_info
+#     finally:
+#         cursor.close()
+#         conn.close()
 def get_all_tables_schema():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()")
-        tables = [t['table_name'] for t in cursor.fetchall()]
+        target_tables = ['bni_rosterreport', 'bni_palms', 'bni_trainingmaster']
         schema_info = {}
-        for table in tables:
-            cursor.execute(f"DESCRIBE {table}")
-            columns = cursor.fetchall()
-            cursor.execute(f"SELECT * FROM {table} LIMIT 10")
-            sample = cursor.fetchall()
-            schema_info[table] = {"columns": columns, "sample_data": sample}
+
+        for table in target_tables:
+            try:
+                cursor.execute(f"DESCRIBE {table}")
+                columns = cursor.fetchall()
+                cursor.execute(f"SELECT * FROM {table} LIMIT 3")
+                sample = cursor.fetchall()
+                schema_info[table] = {"columns": columns, "sample_data": sample}
+            except Exception as e:
+                schema_info[table] = {"error": str(e)}
+
         return schema_info
     finally:
         cursor.close()
@@ -355,6 +376,6 @@ async def health_check():
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}
 
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="127.0.0.1", port=8000)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
