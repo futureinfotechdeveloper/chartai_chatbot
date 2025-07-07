@@ -47,44 +47,84 @@ class ChatRequest(BaseModel):
 def get_db_connection():
     return mysql.connector.connect(**db_config)
 
+
 # def get_all_tables_schema():
 #     conn = get_db_connection()
 #     cursor = conn.cursor(dictionary=True)
 #     try:
-#         cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()")
-#         tables = [t['table_name'] for t in cursor.fetchall()]
+#         target_tables = ['bni_rosterreport', 'bni_palms', 'bni_trainingmaster']
 #         schema_info = {}
-#         for table in tables:
-#             cursor.execute(f"DESCRIBE {table}")
-#             columns = cursor.fetchall()
-#             cursor.execute(f"SELECT * FROM {table} LIMIT 2")
-#             sample = cursor.fetchall()
-#             schema_info[table] = {"columns": columns, "sample_data": sample}
+
+#         for table in target_tables:
+#             try:
+#                 cursor.execute(f"DESCRIBE {table}")
+#                 columns = cursor.fetchall()
+#                 cursor.execute(f"SELECT * FROM {table} LIMIT 3")
+#                 sample = cursor.fetchall()
+#                 schema_info[table] = {"columns": columns, "sample_data": sample}
+#             except Exception as e:
+#                 schema_info[table] = {"error": str(e)}
+
 #         return schema_info
 #     finally:
 #         cursor.close()
 #         conn.close()
+
 def get_all_tables_schema():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        target_tables = ['bni_rosterreport', 'bni_palms', 'bni_trainingmaster']
         schema_info = {}
 
-        for table in target_tables:
-            try:
-                cursor.execute(f"DESCRIBE {table}")
-                columns = cursor.fetchall()
-                cursor.execute(f"SELECT * FROM {table} LIMIT 3")
-                sample = cursor.fetchall()
-                schema_info[table] = {"columns": columns, "sample_data": sample}
-            except Exception as e:
-                schema_info[table] = {"error": str(e)}
+        # bni_rosterreport
+        try:
+            cursor.execute("DESCRIBE bni_rosterreport")
+            columns = cursor.fetchall()
+            cursor.execute("""
+                SELECT * FROM bni_rosterreport br
+                WHERE br.teamname = 'Team1' AND br.activestatus = 'Active'
+               """)
+            sample = cursor.fetchall()
+            schema_info["bni_rosterreport"] = {"columns": columns, "sample_data": sample}
+        except Exception as e:
+            schema_info["bni_rosterreport"] = {"error": str(e)}
+
+        # bni_palms
+        try:
+            cursor.execute("DESCRIBE bni_palms")
+            columns = cursor.fetchall()
+            cursor.execute("""
+                SELECT * FROM bni_palms bp 
+                JOIN bni_rosterreport br 
+                ON br.member_name = CONCAT(TRIM(bp.first_name), ' ', TRIM(bp.last_name))
+                WHERE STR_TO_DATE(bp.from_date, '%d/%m/%Y') >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+                AND br.activestatus = 'Active' """)
+            sample = cursor.fetchall()
+            schema_info["bni_palms"] = {"columns": columns, "sample_data": sample}
+        except Exception as e:
+            schema_info["bni_palms"] = {"error": str(e)}
+
+        # bni_trainingmaster
+        try:
+            cursor.execute("DESCRIBE bni_trainingmaster")
+            columns = cursor.fetchall()
+            cursor.execute("""
+                SELECT * FROM bni_trainingmaster bp 
+                JOIN bni_rosterreport br 
+                ON br.member_name = CONCAT(TRIM(bp.first_name), ' ', TRIM(bp.last_name))
+                WHERE STR_TO_DATE(bp.from_date, '%d/%m/%Y') >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+                AND br.activestatus = 'Active'
+             """)
+            sample = cursor.fetchall()
+            schema_info["bni_trainingmaster"] = {"columns": columns, "sample_data": sample}
+        except Exception as e:
+            schema_info["bni_trainingmaster"] = {"error": str(e)}
 
         return schema_info
     finally:
         cursor.close()
         conn.close()
+
 
 def format_schema_for_ai(schema_info):
     schema_text = ""
